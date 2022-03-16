@@ -1,0 +1,481 @@
+---
+title: "Random_forest"
+author: "Pete Chuckran"
+date: "3/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Random forest analysis 
+
+packages <- c('tidyverse', 'jsonlite','neonUtilities', 'httr', 'ggpmisc', 'GGally',
+              'randomForest', 'tidymodels', 'tidypredict', 'ranger', 'vip', 
+              'doParallel')
+
+## method for loading all packages, and installing ones that are missing if this is launched on a different rig
+lapply(packages, function(x){
+  #browser()
+  ## if the required package is present (TRUE), load it up
+  if (require(x, character.only = TRUE)==TRUE){
+    library(x, character.only=TRUE)
+  } else {
+    install.packages(x)
+  }
+})
+
+```
+
+
+The full dataframe has over 120 parameters, many of which describe similar info (for instance, we have 4 measures of pH) or have many missing values. To get this number down, I want to look at all the available parameters and painstakingly select only the ones I want. I think this is going to be awful, but necessary.
+
+_Austin: May be able to use model to tell use which to pull..._
+
+First, a look at all the parameters
+```{r}
+full_df <- read_csv("../../data/input/derived/full_df.csv")
+colnames(full_df)
+```
+
+To start, I want to remove repetitive and non-predictive reference parameters. The initial plot measurements have a lot of overlap with the cores, so we can remove some of those. Also some nonsense parameters in there that, tbh, I'm embarrassed made it this far. 
+
+_AUSTIN:You can specific the specific variable to exclude in the tidymodels recipe, might be more efficient to build this in the recipe instead. No big deal though. Might want to rename the df below since it is new as well._
+
+```{r}
+full_df <- full_df %>%
+  select(-c(sampleTotalReadNumber, soilID, plotID, refPlotID, phH2o, phCacl2, fourth_plot,
+            dnaSampleID, mean_cn, ID, test, X, reads))
+```
+
+Let's also remove parameters where 1/3rd or more of the values are missing. We can play around with this threshold as need be.
+
+_AUSTIN: What is the rational for 1/3rd? May be best to impute everything, then use ```step_nzv(all_predictors()``` to tell us which variable to remove. With all of this is a fine balance b/w listening to the model and using our expertise._
+
+```{r}
+
+cutoff <- 200
+counts_per_paramter <- apply(full_df, 2, function(x) length(which(!is.na(x))))
+above_cutoff <- counts_per_paramter[counts_per_paramter > cutoff]
+to_keep <- names(above_cutoff)
+sub_df <- full_df %>%
+  select(to_keep)
+
+colnames(sub_df)
+
+```
+
+
+Playing around with Tidymodels
+
+_AUSTIN: Is the linear model matching others that you've ran w/o tidymodels? Good reality check that things are as expected._ 
+
+```{r}
+lm_mod <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_fit <- 
+  lm_mod %>% 
+  fit(GC_adj ~ mean_pH_CaCl * ctonRatio, data = sub_df)
+tidy(lm_fit)
+
+test_pts <- expand.grid(
+            mean_pH_CaCl = c(3, 4,5,6,7,9),
+            ctonRatio = c(2,4,8,10,14,18,22,28,34,40)
+            )
+
+mean_pred <- predict(lm_fit, new_data = test_pts)
+
+conf_int_pred <- predict(lm_fit, 
+                         new_data = test_pts, 
+                         type = "conf_int")
+
+# Now combine: 
+plot_data <- 
+  test_pts %>% 
+  bind_cols(mean_pred) %>% 
+  bind_cols(conf_int_pred)
+
+# and plot:
+ggplot(plot_data, aes(x = ctonRatio)) + 
+  geom_point(aes(y = .pred, color = as.character(mean_pH_CaCl))) + 
+  geom_errorbar(aes(ymin = .pred_lower, 
+                    ymax = .pred_upper),
+                width = .2) 
+```
+
+Austin, ignore this for now. Just getting some bones in place. 
+
+_AUSTIN: Repeating above as a placeholder to revisit. You can specific the specific variable to exclude in the tidymodels recipe, might be more efficient to build this in the recipe instead._
+
+```{r}
+# Remove other genomic traits
+RF_df_tst <- sub_df %>%
+  select(-c(GC, Genome_C, Genome_CN, Genome_N, 
+            year, Genomes, Nuc_CN, AA_CN, AGS, bp,
+            collectDate)) %>%
+  select(horizon, GC_bact, mean_pH_water)
+
+# For a test, remove all NAs
+#RF_df_tst <- na.omit(RF_df_tst)
+
+```
+
+_AUSTIN: Ignoring this below. Not sure what is going on with the logistic regression stuff._
+
+```{r}
+# Set seed... see what I did there?
+set.seed(42069)
+
+# Train and test split, splitting along site
+data_split <- initial_split(RF_df_tst, prop = 0.80, strata = 'horizon')
+RF_train <- training(data_split)
+RF_test <- testing(data_split)
+
+```
+
+```{r}
+horizon_recipe <- 
+  # Model recipe
+  recipe(horizon ~ ., data = RF_train)%>% 
+  # Create dummmy variable for all char/factor that are not response
+  step_dummy(all_nominal(), -all_outcomes())%>% 
+  #remove zero variance predictors
+  step_zv(all_predictors())
+
+lr_mod <- 
+  logistic_reg() %>% 
+  set_engine("glm")
+
+
+horizon_wflow <- 
+  workflow() %>% 
+  add_model(lr_mod) %>% 
+  add_recipe(horizon_recipe)
+
+
+
+horizon_fit <- horizon_wflow %>% fit(data = RF_train)
+
+horizon_fit %>% 
+  pull_workflow_fit() %>% 
+  tidy()
+
+
+horizon_pred <- 
+  predict(horizon_fit, RF_test, type = "prob") %>% 
+  bind_cols(RF_test %>% select(horizon)) 
+
+# The data look like: 
+horizon_pred
+
+horizon_pred %>% 
+  roc_curve(truth = as.factor(horizon), .pred_O) %>% 
+  autoplot()
+```
+```{r}
+colnames(sub_df)
+```
+_AUSTIN: For the sake of testing, I'm going to rough out some extended possible recipe and workflow. Please keep this code in case it's needed!_
+
+```{r}
+
+# Remove non-predictive data
+full_df <- read_csv("../../data/input/derived/full_df.csv")
+filter_df <- full_df %>%
+  filter(sampleFilteredReadNumber > 2000000)
+
+# Remove predictors containing < 270 (70%) responses
+cutoff <- 270
+counts_per_paramter <- apply(filter_df, 2, function(x) length(which(!is.na(x))))
+above_cutoff <- counts_per_paramter[counts_per_paramter > cutoff]
+to_keep <- names(above_cutoff)
+rf_df <- filter_df %>%
+  select(to_keep)
+
+colnames(rf_df)
+
+
+# Set seed... see what I did there? bruuuuhhh -_-
+set.seed(420)
+
+pca_trans <- recipe( ~ mean_pH_CaCl + mean_pH_water + sd_pH_CaCl + sd_pH_water +
+            mega_phCacl2 + mega_phH2o, data = rf_df) %>%
+  step_knnimpute(all_numeric()) %>% 
+  step_normalize(all_numeric()) %>%
+  step_pca(all_numeric(), num_comp = 2)
+
+pca_estimates <- prep(pca_trans, training = rf_df)
+pca_data <- bake(pca_estimates, rf_df)
+
+rf_df <- rf_df %>% bind_cols(pca_data)
+
+# Train and test split, splitting along site
+# Austin: May want to bump to prop = 0.7 depending on amount of train vs test data available
+data_split <- initial_split(rf_df, prop = 0.70, strata = 'horizon')
+RF_train <- training(data_split)
+RF_test <- testing(data_split)
+
+# make folds for k-fold cross-validation
+GC_vfold <- vfold_cv(RF_train, v = 5, repeats = 5) # usually min of 5-fold cross-validation
+
+# GC_vfold %>% 
+#   mutate(df_ana = map(splits, analysis),
+#          df_ass = map(splits, assessment))
+
+# Build out the recipe, steps are v important 
+GC_recipe <- 
+  recipe(GC_bact ~ ., data = RF_train) %>% # predict GC_bact
+  step_string2factor(ID, siteID,dnaSampleID, soilID, plotID, nlcdClass, horizon) %>% # factors factors not char
+  update_role(ID, horizon, siteID, soilID, plotID, new_role = "ID") %>% # make ids for possible back tracking
+  step_date(collectDate) %>% # make sure date is date
+  step_rm(ID, horizon, siteID, soilID, plotID, collectDate, year, X,
+          dnaSampleID, verticalPosition, soilID, sampleTotalReadNumber,
+          sampleFilteredReadNumber, reads, plotID, test, GC, Genome_C, Genome_CN, Genome_N, 
+          year, Genomes, Nuc_CN, AA_CN, AGS, bp, GC_adj, mean_pH_CaCl, mean_pH_water, sd_pH_CaCl, sd_pH_water, mega_phCacl2, mega_phH2o) %>% # remove from model
+  step_knnimpute(all_numeric()) %>% # k-nn for imputing
+  step_dummy(all_nominal(), -all_outcomes()) %>% # create dummy variables for all char/factor that are not response
+  step_normalize(all_predictors()) %>% # center and scale all variables...apples to apples
+  step_zv(all_predictors()) #remove zero variance predictors
+
+# parallel processing
+# num_cores <- 7
+# cl <- makeCluster(num_cores, outfile = "")
+# clusterEvalQ(cl, library(tidymodels))
+# registerDoParallel(cl)
+
+# Apply recipe preprocessing to training data
+rf_prepped <- prep(GC_recipe, training = RF_train) # preps data, applies recipe
+
+# Run (bake) prepped preprocessng to training & testing data to see the number of final dummy variables and that recipe works
+rf_train_bake <- bake(rf_prepped, new_data = RF_train)
+
+rf_test_bake <- bake(rf_prepped, new_data = RF_test)
+
+# define rf model hyperparams
+RF_mod <- rand_forest(mtry = tune(),
+                      min_n = tune(),
+                      trees = 1000,
+                      mode = "regression") %>%
+  set_engine("ranger",
+             importance = "impurity")
+
+# combine model and recipe into workflow
+GC_wflow <- 
+  workflow() %>% 
+  add_model(RF_mod) %>% 
+  add_recipe(GC_recipe)
+
+# Set up the initial tuning grid for finding best mtry and min_n (hyperparameters)
+# Match mtry with number of predictor variables (35) following preprocessing divided by three
+# Match min_n to sqrt (rounded up) of number of predictor variables (11)
+# Expanding tuning grid below because the small one was kinda shit for min_n
+rf_param <-
+  GC_wflow %>%
+  parameters() %>%
+  update(mtry = mtry(range = c(1L, 35L)),
+         min_n = min_n(range = c(1L, 11L)))
+
+rf_tune_grid <- grid_regular(rf_param, levels = 35)
+
+rf_tune_grid
+
+
+# below runs the first model, prior to any hyperparameter tuning
+# takes about 45min-hour with 4 cores
+# takes about 30min with 7 cores
+# commenting out just to be safe and don't have parallel set up
+rf_fit_results <- tune_grid(GC_wflow,
+                           resamples = GC_vfold,
+                           grid = rf_tune_grid,
+                           metrics = metric_set(rmse, mae, rsq))
+
+# keep rds of full model to save future memory
+saveRDS(rf_fit_results, "./rds_files/GCBact_model_RF_full.rds")
+
+# load in large model rds
+#rf_fit_results <- readRDS(file = "./rds_files/GCBact_model_RF_full.rds")
+
+# Graphs rmse for all min_n and mtry
+rf_param_plot <- rf_fit_results %>%
+  collect_metrics() %>%
+  dplyr::filter(.metric == "rmse") %>%
+  dplyr::select(mean, min_n, mtry) %>%
+  tidyr::pivot_longer(min_n:mtry,
+                      values_to = "value",
+                      names_to = "parameter") %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "RMSE")
+
+rf_param_plot
+
+# Look at best random forest models based on the Mean Absolute Error (and/or RMSE)
+show_best(rf_fit_results, metric = "mae")
+show_best(rf_fit_results, metric = "rmse")
+
+# Update tuning grid based on best +1, -1 range of min_n and mtry
+rf_grid_update <- grid_regular(
+  mtry(range = c(18, 34)),
+  min_n(range = c(1, 3)),
+  levels = 32)
+
+# Tune random forest with targets min_n and mtry ranges
+rf_fit_update <- tune_grid(GC_wflow, 
+                           resamples = GC_vfold,
+                           grid = rf_grid_update,
+                           metrics = metric_set(rmse, mae, rsq))
+
+# keep rds of full model to save future memory
+saveRDS(rf_fit_update, "./rds_files/GCBact_model_RF_small.rds")
+
+# load in small model rds
+#rf_fit_update <- readRDS("./rds_files/GCBact_model_RF_small.rds")
+
+# Look at the best set of hyperparameters
+show_best(rf_fit_update, metric = "rmse")
+show_best(rf_fit_update, metric = "mae")
+show_best(rf_fit_update, metric = "rsq")
+
+# Pull out parameters of the best model based on RMSE (for prediction)
+rf_best <- rf_fit_update %>% select_by_pct_loss(mtry, metric = "rmse")
+
+# Finalize the model with the parameters of the best selected model
+final_rf <- finalize_model(RF_mod, rf_best)
+
+# Rerun final model and output the variable importance based on the GINI index, point is ID only
+rf_vip_train <- final_rf %>%
+  fit(GC_bact ~ .,
+      data = rf_train_bake) %>%
+  vip(geom = "point", num_features = 101) # variable importance graph
+
+rf_vip_train
+
+# check if same VIPs come out with test data
+rf_vip_test <- final_rf %>%
+  fit(GC_bact ~ .,
+      data = rf_test_bake) %>%
+  vip(geom = "point", num_features = 34) # variable importance graph
+
+rf_vip_test
+
+# Finalize Workflow
+final_wf <- workflow() %>%
+  add_recipe(GC_recipe) %>%
+  add_model(final_rf)
+
+# Apply last workflow to training and testing data
+final_res <- final_wf %>%
+  last_fit(data_split)
+
+# Look at final model performance metrics (mae, rmse, rsq)
+final_res %>%
+  collect_metrics()
+
+show_best(final_res, metric = "rmse")
+show_best(final_res, metric = "rsq")
+
+# Compare predicted GC_bact values to test GC_bact
+final_res %>% 
+  collect_predictions(summarize = FALSE) %>% arrange(desc(GC_bact))
+
+# Graph of predicted values to testing pwc
+rf_plot <- final_res %>%
+  collect_predictions() %>%
+  ggplot(aes(GC_bact, .pred)) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  labs(y = 'Random Forest Predicted GC_bact', x = 'Original GC_bact') +
+  scale_color_manual(values = c("gray80", "darkred"))+
+  geom_abline(intercept = 0, slope = 1, color = "blue", size = 1)+
+  stat_smooth(method = "lm", formula = y ~ x, color = "red")+
+  ggpmisc::stat_poly_eq(formula = y ~ x, 
+                        aes(label =  paste(stat(eq.label),
+                                           stat(rr.label), stat(p.value.label), sep = "*\", \"*")),
+                        parse = TRUE)+
+  theme_bw()
+
+rf_plot
+
+###Not bad!
+
+```
+
+_AUSTIN: Below is from Pete's original testing script._
+```{r}
+
+#Moving what was above to a new chunk directly here in case Pete wants later
+GC_fit <- GC_wflow %>% fit(data = RF_train)
+
+
+GC_pred <- 
+  predict(GC_fit, RF_test) %>% 
+  bind_cols(RF_test %>% select(GC_bact)) 
+
+# The data look like: 
+GC_pred %>%
+  ggplot(., aes(GC_bact, .pred))+
+  geom_point()
+
+ranger_obj <- pull_workflow_fit(GC_fit)$fit
+ranger_obj
+ranger_obj$variable.importance
+
+```
+
+```{r}
+GC_fit2 <- mutate(GC_vfold,
+                  df_ana = map (splits,  analysis),
+                  df_ass = map (splits,  assessment))
+GC_fit2
+
+
+GC_param <-
+  GC_wflow %>%
+  parameters() %>%
+  update(mtry = mtry(range = c(1L, 10L)),
+         min_n = min_n(range = c(1L, 6L)))
+
+GC_grid <- grid_regular(GC_param, levels = 5)
+GC_grid
+rf_search <- tune_grid(GC_wflow, 
+                       grid = GC_grid, 
+                       resamples = GC_vfold)
+```
+
+```{r}
+select_best(rf_search, metric = "rmse")
+autoplot(rf_search, metric = "rmse") 
+rf_param_final <- select_best(rf_search, metric = "rmse")
+rf_param_final
+```
+
+```{r}
+GC_wflow_final <- finalize_workflow(GC_wflow, rf_param_final)
+GC_wflow_final_fit <- fit(GC_wflow_final, data = RF_train)
+GC_wflow_final_fit
+
+```
+
+```{r}
+pulled_recipe <- pull_workflow_prepped_recipe(GC_wflow_final_fit)
+pulled_final_fit <- pull_workflow_fit(GC_wflow_final_fit)
+
+RF_test$.pred <- predict(pulled_final_fit, 
+                          new_data = bake(pulled_recipe, RF_test))$.pred
+
+
+metrics(RF_test, truth = GC_bact, estimate = .pred)
+```
+
+```{r}
+vip(GC_wflow_final_fit)
+```
+
+```{r}
+final_mod <- finalize_model(RF_mod, rf_param_final)
+final_mod %>%
+  fit(GC_bact ~ ., 
+      data = RF_train) %>%
+  vip(geom = "point")
+```
+

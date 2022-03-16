@@ -1,0 +1,57 @@
+packages <- c('tidyverse', 'jsonlite','neonUtilities', 'httr')
+
+# trigger for whether to retrieve data now, or to load data from existing file directory
+get_data = FALSE
+
+## method for loading all packages, and installing ones that are missing if this is launched on a different rig
+lapply(packages, function(x){
+  #browser()
+  ## if the required package is present (TRUE), load it up
+  if (require(x, character.only = TRUE)==TRUE){
+    library(x, character.only=TRUE)
+  } else {
+    install.packages(x)
+  }
+})
+
+#### load custom functions, if any
+# file_sources <- list.files(file.path('code', 'functions'), pattern="*.R$", 
+#                            full.names=TRUE, ignore.case=TRUE)
+# 
+# file_sources <- base::tryCatch(invisible(sapply(file_sources, source, .GlobalEnv)), 
+#                                error = function(e) {
+#                                  logger::log_error(base::paste0('Line 15: Error loading functions.'))
+#                                  base::stop()
+#                                })
+
+## list of soil related data products
+soil_products <- c(
+  dpid1 <- 'DP1.10086.001', ### physical, isotope, and chemical properties
+  dpid2 <- 'DP1.10107.001', ### soil metagenomic sequences
+  dpid3 <- 'DP1.10109.001', ### soil microbial group abundances 
+  dpid4 <- 'DP1.10104.001', ### soil microbial biomass
+  dpid5 <- 'DP1.10108.001' ### soil marker genes
+)
+
+if (get_data == TRUE){
+  last_run <- Sys.Date()
+  
+  write.csv(last_run, 'last_run_getdata.csv', row.names=FALSE)
+  
+  ## retrieve data from API
+  data_list <- lapply(soil_products[2:length(soil_products)], FUN = function(x){
+    data <- loadByProduct(dpID = x, site = 'all', token=Sys.getenv('NEON_TOKEN'), check.size=FALSE)
+    return(data)
+  })
+  
+  ## write list of data.frames to folder as a compressed .rds file
+  saveRDS(data_list, paste0('data/input/soil_products_', last_run))
+  
+} else if (get_data == FALSE){
+  
+  last_run <- read.csv('last_run_getdata.csv')
+  
+  ## load data in
+  readRDS()
+}
+

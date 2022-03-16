@@ -1,0 +1,13 @@
+Parameters
+metagenome:	BMI_Plate42WellE5_RPE_1.fastq,BMI_Plate42WellE5_RPE_2.fastq
+reads_sampled:	2000000
+trimmed_length:	150
+min_quality:	-5
+mean_quality:	-5
+filter_dups:	False
+max_unknown:	100
+
+Results
+average_genome_size:	6715953.21351
+total_bases:	3533588867
+genome_equivalents:	526.148523473

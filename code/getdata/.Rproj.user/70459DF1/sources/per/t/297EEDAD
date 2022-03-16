@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1605908024401.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2886360708",
+    "id" : "297EEDAD",
+    "lastKnownWriteTime" : 1605910309,
+    "last_content_update" : 1605910309834,
+    "path" : "~/GitHub/frida/code/getdata/get_data_nongenomic.R",
+    "project_path" : "get_data_nongenomic.R",
+    "properties" : {
+        "cursorPosition" : "40,2",
+        "scrollLine" : "14",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

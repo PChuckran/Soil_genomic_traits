@@ -1,0 +1,13 @@
+Parameters
+metagenome:	Plate42WellE8_RPE_1.fastq,Plate42WellE8_RPE_2.fastq
+reads_sampled:	2000000
+trimmed_length:	150
+min_quality:	-5
+mean_quality:	-5
+filter_dups:	False
+max_unknown:	100
+
+Results
+average_genome_size:	7355761.41644
+total_bases:	4961045962
+genome_equivalents:	674.443566224

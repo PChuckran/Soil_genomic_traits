@@ -1,0 +1,13 @@
+Parameters
+metagenome:	BMI_Plate81WellA2_RPE_1.fastq,BMI_Plate81WellA2_RPE_2.fastq
+reads_sampled:	2000000
+trimmed_length:	150
+min_quality:	-5
+mean_quality:	-5
+filter_dups:	False
+max_unknown:	100
+
+Results
+average_genome_size:	5790019.58916
+total_bases:	3409721363
+genome_equivalents:	588.89634318

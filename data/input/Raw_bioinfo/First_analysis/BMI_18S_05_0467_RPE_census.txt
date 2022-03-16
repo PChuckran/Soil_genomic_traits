@@ -1,0 +1,13 @@
+Parameters
+metagenome:	BMI_18S_05_0467_RPE_1.fastq,BMI_18S_05_0467_RPE_2.fastq
+reads_sampled:	2000000
+trimmed_length:	150
+min_quality:	-5
+mean_quality:	-5
+filter_dups:	False
+max_unknown:	100
+
+Results
+average_genome_size:	6100854.92737
+total_bases:	5090232703
+genome_equivalents:	834.347442056

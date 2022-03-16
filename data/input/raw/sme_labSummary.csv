@@ -1,0 +1,2 @@
+"uid","laboratoryName","labSpecificStartDate","labSpecificEndDate","testProtocolVersion","lipidID","analysisStandardID","analyteKnownValue","instrument","analyteAccuracy","analyteStandardDeviation","reviewedBy","dataQF","publicationDate"
+"dfc37c8b-bd29-41a4-94a4-31d3b640c889","Microbial ID, Inc",2019-04-01,2019-09-01,"Midi_PLFA_SOP_v1","C20:0/C19:0 ratio","MIDI 1208",1.91,"Agilent GC 6890",0.01,0.01,"D7G09PRQ+KA2kODxLhpcfcHfnNS6aW7h","0","20210123T023002Z"
