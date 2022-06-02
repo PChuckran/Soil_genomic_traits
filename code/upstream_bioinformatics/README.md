@@ -109,3 +109,20 @@ The jupyter notebook files `Output_reformat.ipynb` and `kegg_output_parser.ipynb
 ### Second analysis
 
 We also determined the average GC content for each domain and for each gene in a metagenome using the script `remerge.py`. The output of these files was merged using `GC_by_kegg.ipynb` and `Second_output_reformat.ipynb`. These data were not included in this manuscript but have been included here for public use. Again, we ask that any use of these data references the associated paper. 
+
+
+## 16S rRNA gene analysis
+
+Sequences were downloaded from the Genome Taxonomy Database, and high quality sequences (>95% complete, <5% contaminated) were compiled into a database using the following command:
+```
+makeblastdb -in hq_subset.fna -parse_seqids -dbtype nucl -out hqdb
+```
+NEON 16S rRNA gene sequences were then blasted against this database using the command:
+```
+blastn -query $file -db ../hqdb/hqdb -outfmt 6 -max_target_seqs 1 -out ../blast_output/$outfile -num_threads 8
+```
+Taxonomic output files were then merged with known sizes for each taxa using the following custon python script
+```
+merge_16_w_gtdb.py $taxa_file
+```
+
