@@ -125,4 +125,4 @@ Taxonomic output files were then merged with known sizes for each taxa using the
 ```
 merge_16_w_gtdb.py $taxa_file
 ```
-
+Depth adjusted GC content for the 16S rRNA genes was calculated for each amplicon dataset using the code in `Nucleotide_16S_parser.ipynb`. **note for those reproducing results: the fasta files containing the sequences information contained the read depth at the end of each sequence name. The code featured here uses this value for the depth adjustment**
