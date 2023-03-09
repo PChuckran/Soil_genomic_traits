@@ -62,10 +62,11 @@ GC_recipe <-
   step_string2factor(ID, siteID,dnaSampleID, soilID, plotID, nlcdClass, horizon) %>% # factors factors not char
   update_role(ID, horizon, siteID, soilID, plotID, new_role = "ID") %>% # make ids for possible back tracking
   step_date(collectDate) %>% # make sure date is date
-  step_rm(ID, horizon, siteID, soilID, plotID, collectDate, year, X,
+  step_rm(ID, siteID, soilID, plotID, collectDate, year, X,
           dnaSampleID, verticalPosition, soilID, sampleTotalReadNumber,
           sampleFilteredReadNumber, reads, plotID, test, GC, Genome_C, Genome_CN, Genome_N, 
-          year, Genomes, Nuc_CN, AA_CN, AGS, bp, GC_adj
+          year, Genomes, Nuc_CN, AA_CN, AGS, bp, GC_adj, GC_marker, AGS_marker,
+          Coding_density_marker, num_taxa_marker
           ) %>% # remove from model
   step_knnimpute(all_numeric()) %>% # k-nn for imputing
   step_dummy(all_nominal(), -all_outcomes()) %>% # create dummy variables for all char/factor that are not response
@@ -274,7 +275,6 @@ for(var in 1:length(importance_rd1_ordered)){
 }
 
 
-nonredundant_features
 ```
 
 
@@ -286,10 +286,11 @@ GC_recipe <-
   step_string2factor(ID, siteID,dnaSampleID, soilID, plotID, nlcdClass, horizon) %>% # factors factors not char
   update_role(ID, horizon, siteID, soilID, plotID, new_role = "ID") %>% # make ids for possible back tracking
   step_date(collectDate) %>% # make sure date is date
-  step_rm(ID, horizon, siteID, soilID, plotID, collectDate, year, X,
+  step_rm(ID, siteID, soilID, plotID, collectDate, year, X,
           dnaSampleID, verticalPosition, soilID, sampleTotalReadNumber,
           sampleFilteredReadNumber, reads, plotID, test, GC, Genome_C, Genome_CN, Genome_N, 
-          year, Genomes, Nuc_CN, AA_CN, AGS, bp, GC_adj
+          year, Genomes, Nuc_CN, AA_CN, AGS, bp, GC_adj, GC_marker, AGS_marker,
+          Coding_density_marker, GC_16s
           ) %>% # remove from model
   step_rm(redundant_features)%>%
   step_knnimpute(all_numeric()) %>% # k-nn for imputing
@@ -339,10 +340,10 @@ rf_tune_grid
 # takes about 45min-hour with 4 cores
 # takes about 30min with 7 cores
 # commenting out just to be safe and don't have parallel set up
-#rf_fit_results <- tune_grid(GC_wflow,
-#                           resamples = GC_vfold,
-#                           grid = rf_tune_grid,
-#                           metrics = metric_set(rmse, mae, rsq))
+# rf_fit_results <- tune_grid(GC_wflow,
+#                            resamples = GC_vfold,
+#                            grid = rf_tune_grid,
+#                            metrics = metric_set(rmse, mae, rsq))
 
 # keep rds of full model to save future memory
 #saveRDS(rf_fit_results, "../data/input/random_forest/GCBact_model_RF_sub.rds")
@@ -454,26 +455,33 @@ rf_plot
 
 ```{r}
 rf_vip_train <- rf_fit_train %>%
-  vip(geom = "point", num_features = 10)
+  vip(geom = "point", num_features = 8)
+
 
 theme_pete<- function(base_size = 14) {
-  theme_bw(base_size = base_size) %+replace%
+  theme_minimal(base_size = base_size) %+replace%
     theme(
       strip.background =element_blank(),
       strip.placement = "outside",
       #panel.grid.major.y = element_blank(),
       panel.grid.minor.y = element_blank(),
-      panel.grid.minor.x = element_blank(),
+      #panel.grid.minor.x = element_blank(),
       panel.grid.major.x = element_blank()
     )
 }
 
-Fig_3a <- rf_vip_train+
+Fig_2a <- rf_vip_train+
   theme_pete()+
   geom_point(size = 4, shape = 21, fill = "darkred")
-Fig_3a
+Fig_2a
 
-ggsave(plot = Fig_3a, filename = "../paper/figures/Fig3a.png")
+#ggsave(plot = Fig_3a, filename = "../paper/figures/Fig_2a.svg")
 ```
 
+```{r}
+to_export <- as.data.frame(rf_fit_train$fit$variable.importance)
+to_export <- tibble::rownames_to_column(to_export, "var")
+colnames(to_export) <- c("variable", "importance")
+write_csv(to_export, file = "../data/output/gc_variable_importance.csv")
+```
 

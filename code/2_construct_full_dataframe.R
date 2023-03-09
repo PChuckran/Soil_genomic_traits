@@ -45,6 +45,7 @@ fungal_to_bacterial <- get_ftob(refresh = F)
 plfa <- get_plfa(refresh = T)
 mega <- get_megapit(refresh = T)
 marker_est <- get_marker_estimates(refresh = T)
+gc_16s <- get_16s_gc(refresh = T)
 
 
 # I know this isn't elegant but.... meh. I wanted to go through step by step
@@ -60,7 +61,8 @@ full_df <- left_join(metagenomes, pH)%>%
   left_join(., fungal_to_bacterial)%>%
   left_join(., plfa) %>%
   left_join(., mega) %>%
-  left_join(., marker_est)
+  left_join(., marker_est)%>%
+  left_join(., gc_16s)
 
 
 

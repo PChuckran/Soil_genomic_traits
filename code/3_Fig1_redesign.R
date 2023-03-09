@@ -1,4 +1,4 @@
-packages <- c('tidyverse', 'ggpmisc', 'viridis', 'patchwork', 'GGally', 'multcompView', 'ggtext')
+packages <- c('tidyverse', 'ggpmisc', 'viridis', 'patchwork', 'GGally', 'multcompView', 'ggtext', 'svglite')
 
 ## method for loading all packages, and installing ones that are missing if this is launched on a different rig
 lapply(packages, function(x){
@@ -15,26 +15,27 @@ lapply(packages, function(x){
 full_df <- read.csv("data/input/derived/full_df.csv") %>%
   mutate(Mbp = AGS/1000000)
 
-theme_map<- function(base_size = 5, base_family = "Helvetica") {
+theme_map<- function(base_size = 8, base_family = "Helvetica") {
   # Starts with theme_grey and then modify some parts
-  theme_minimal(base_size = base_size) %+replace%
+  theme_bw(base_size = base_size) %+replace%
     theme(
+      panel.border = element_rect(size = 1, fill = NA),
       strip.background = element_blank(),
-      panel.grid.major.y = element_blank(),
+      #panel.grid.major.y = element_blank(),
       panel.grid.minor.y = element_blank(),
       panel.grid.minor.x = element_blank(),
-      panel.grid.major.x = element_blank(),
+      #panel.grid.major.x = element_blank(),
       axis.title.x = element_blank(),
       axis.title.y = element_blank(),
-      axis.text.x = element_blank(),
-      axis.text.y = element_blank()
+      #axis.text.x = element_blank(),
+      #axis.text.y = element_blank()
       
     )
 }
 
-min_lat = min(full_df$lat)-2
-max_lat = max(full_df$lat)+2
-min_long = min(full_df$long)-10
+min_lat = min(full_df$lat)-5
+max_lat = max(full_df$lat)+8
+min_long = min(full_df$long)-9
 max_long = max(full_df$long)+2
 
 state <- map_data("world")
@@ -57,22 +58,21 @@ Fig_1A <- ggplot() +
   ylab("Latitude")+
   theme_map()+
   #scale_shape_manual(values = shape_scale)+
-  theme(legend.position = c(0.7,0.8),
+  theme(legend.position = c(0.6,0.8),
         legend.box.background = element_rect(colour = "black"),
-        legend.text=element_text(size=5),
+        legend.text=element_text(size=7),
         legend.box = "vertical",
         legend.direction = "horizontal",
         legend.key.size = unit(.3, 'cm'),
         legend.box.just = "center")+
-  #scale_fill_continuous(palette = "Greens", "Bacterial\nGC-%")+
-  scale_fill_distiller("Bacterial\nGC-%", palette = "BuGn", breaks = c(60, 64, 68))+
+  #scale_fill_continuous(palette = "Greens", "GC (%)")+
+  scale_fill_distiller("Bacterial\nGC (%)", palette = "BuGn", breaks = c(60, 64, 68))+
   xlim(min_long, max_long)+
   ylim(min_lat, max_lat)+
   theme(text=element_text(family="Arial"))+
-  scale_size(name = "Average\nGenome Size (Mbp)", breaks = c(5.5, 6.5, 7.5))
+  scale_size(name = "Average\ngenome size (Mbp)", breaks = c(5.5, 6.5, 7.5))
 
 Fig_1A
-
 
 
 
@@ -83,6 +83,7 @@ agg <- c("cultivatedCrops", "pastureHay")
 theme_pete<- function(base_size = 8) {
   theme_bw(base_size = base_size) %+replace%
     theme(
+      panel.border = element_rect(size = 1, fill = NA),
       strip.background =element_blank(),
       strip.placement = "outside",
       panel.grid.major.y = element_blank(),
@@ -105,14 +106,14 @@ outliers <- boxplot(full_df$soil_OrgCtoN, plot=FALSE)$out
 full_df<- full_df[-which(full_df$soil_OrgCtoN %in% outliers),]
 
 
-
-my.formula <- y ~ poly(x, 3, raw=TRUE)
+my.formula <- y ~ poly(x, 1, raw=TRUE)
 Fig_1B_CtoN_GC <- full_df %>%
   ggplot(., aes(soil_OrgCtoN, GC_100))+
   geom_point(alpha = 0.7, size = 1.5, shape =21, fill = "#0C2340")+
   geom_smooth(method = "lm", se = F, color = "#BD3039", formula=my.formula)+
   stat_poly_eq(formula = my.formula, 
                aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
+               small.p = T, 
                label.x = "right",
                label.y = "top",
                color = "#BD3039",
@@ -125,9 +126,12 @@ Fig_1B_CtoN_GC <- full_df %>%
 
 Fig_1B_CtoN_GC
 
+       
 
 mod_CN_GC <- lm(GC_100 ~ poly(soil_OrgCtoN, 3, raw = T), full_df)
 summary(mod_CN_GC)
+
+
 
 my.formula <- y ~ poly(x, 1, raw=TRUE)
 
@@ -137,27 +141,29 @@ Fig_1C_CtoN_AGS <- full_df %>%
   ggplot(., aes(soil_OrgCtoN, AGS_val, fill = Source))+
   stat_poly_eq(formula = my.formula, 
                aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~"), color = Source),
-               label.x = "right",
-               label.y = "bottom",
+               small.p = T, 
+               label.x = "left",
+               label.y = "top",
                parse = TRUE,
                size = 2.25)+
-  ylab("Average Genome Size (bp)")+
+  ylab("Average genome size (bp)")+
   xlab(expression(Soil~C["extr"]:N["extr"]))+
   scale_linetype_manual(values=c("solid", "solid"))+
   scale_fill_manual(values = c("white", "#0C2340"))+
   scale_color_manual(values = c("blue", "#BD3039"))+
-  geom_point(alpha = 0.7, size = 2, shape =21)+
+  geom_point(alpha = 0.7, size = 1.5, shape =21)+
   geom_smooth(aes(linetype=Source, color = Source), method = "lm", se = F, formula=my.formula)+
   theme_pete()+
   theme(#legend.position = c(.8,.15), 
-    legend.position = "right",
+    legend.position = "bottom",
         legend.title = element_blank(),
-        legend.direction = "vertical",
-        legend.text=element_text(size=4),
+        legend.direction = "horizontal",
+        legend.text=element_text(size=6),
         text=element_text(family="Arial"),
         legend.background = element_rect(fill = "transparent"))
 
 Fig_1C_CtoN_AGS
+
 
 CN_AGS_MG <- lm(AGS ~ soil_OrgCtoN, full_df)
 summary(CN_AGS_MG)
@@ -167,379 +173,55 @@ summary(CN_AGS_m16)
 
 my.formula <- y ~ poly(x, 1, raw=TRUE)
 
-Fig_1D_CtoN_AA <- full_df %>%
-  ggplot(., aes(soil_OrgCtoN, AA_CN))+
-  geom_point(alpha = 0.7, size = 1.5, shape =21, fill = "#0C2340")+
-  geom_smooth(method = "lm", se = F, color = "#BD3039", formula=my.formula)+
-  stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
-               label.x = "right",
-               label.y = "bottom",
-               color = "#BD3039",
-               parse = TRUE,
-               size = 2.25)+
-  ylab("Amino Acid C:N")+
-  xlab(expression(Soil~C["extr"]:N["extr"]))+
-  theme_pete()+
-  theme(text=element_text(family="Arial"))
-Fig_1D_CtoN_AA
+scg_data <- read.csv("data/input/derived/all_scgs_all.csv")
 
-mod_CN_AA <- lm(AA_CN ~ soil_OrgCtoN, full_df)
-summary(mod_CN_AA)
+scg_data <- scg_data %>%
+  mutate(ID = str_replace(MGID, "_R_genes", ""))%>%
+  mutate(ID = str_replace(ID, "_mms", ""))
 
-my.formula <- y ~ poly(x, 1, raw=TRUE)
+full_df <- left_join(full_df, scg_data)
 
-Fig_1E_GC_AA <- full_df %>%
-  ggplot(., aes(GC*100, AA_CN))+
-  geom_point(alpha = 0.7, size = 1.5, shape =21, fill = "#0C2340")+
-  geom_smooth(method = "lm", se = F, color = "#BD3039", formula=my.formula)+
-  stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
-               label.x = "right",
-               label.y = "top",
-               color = "#BD3039",
-               parse = TRUE,
-               size = 2.25)+
-  ylab("Amino Acid C:N")+
-  xlab("GC (%)")+
-  theme_pete()+
-  theme(text=element_text(family="Arial"))
-Fig_1E_GC_AA
-
-mod_GC_AA <- lm(AA_CN ~ GC_100, full_df)
-summary(mod_GC_AA)
-
-
-Fig1 <- (Fig_1A + (Fig_1B_CtoN_GC + Fig_1C_CtoN_AGS + Fig_1D_CtoN_AA + 
-                     Fig_1E_GC_AA))+ 
-  plot_annotation(tag_levels = 'A') &
-  theme(plot.tag = element_text(size = 12))
-
-Fig1
-
-ggsave(filename = "paper/figures/Fig1.png", Fig1, height = 4.5, width = 11)
-
-
-codon_aa_key <- read_csv("data/input/derived/AA_w_codon_CN.csv")
-
-codon_aa_key$GC_pairs <- as.character(codon_aa_key$GC)
-
-AA_codon_means <- codon_aa_key %>% 
-  group_by(AA)%>%
-  summarize(mean_codon_CN = mean(Nuc_CN))
-
-Codon_means <- codon_aa_key %>% 
-  group_by(Codon)%>%
-  summarize(mean_codon_CN = mean(Nuc_CN))
-
-MG_aa_codon <- read.csv("data/input/derived/codon_usage.csv") %>%
-  select(-X)
-MG_aa_codon$stop = MG_aa_codon$X.
-
-
-# Red rid of some tails on the labID that could be problematic 
-#MG_aa_codon$ID <- str_replace(MG_aa_codon$ID, "_mms", "")
-
-# Listen, I know this isn't the most elegant solution, but I just took the values from the `AA_codon_means`
-# table to get these values. The nice thing is the AA in the df are proportions, so no dividing necessary
-MG_aa_codon <- MG_aa_codon %>%
-  mutate(theor_codon_cn =
-           ((stop*1.363333)+(A*1.175000)+(C*1.280000)+
-              (D*1.280000)+(E*1.280000)+(F*1.380000)+
-              (G*1.175000)+(H*1.280000)+(I*1.396667)+
-              (K*1.380000)+(L*1.313333)+(M*1.330000)+
-              (N*1.380000)+(P*1.175000)+(Q*1.280000)+
-              (R*1.210000)+(S*1.280000)+(T*1.280000)+
-              (V*1.280000)+(W*1.230000)+(Y*1.380000)
-           ),
-         real_codon_cn = 
-           ((AAA*1.43)+(AAC*1.33)+(AAG*1.33)+(AAT*1.43)+(ACA*1.33)+
-              (ACC*1.23)+(ACG*1.23)+(ACT*1.33)+(AGA*1.33)+(AGC*1.23)+
-              (AGG*1.23)+(AGT*1.33)+(ATA*1.43)+(ATC*1.33)+(ATG*1.33)+
-              (ATT*1.43)+(CAA*1.33)+(CAC*1.23)+(CAG*1.23)+(CAT*1.33)+
-              (CCA*1.23)+(CCC*1.12)+(CCG*1.12)+(CCT*1.23)+(CGA*1.23)+
-              (CGC*1.12)+(CGG*1.12)+(CGT*1.23)+(CTA*1.33)+(CTC*1.23)+
-              (CTG*1.23)+(CTT*1.33)+(GAA*1.33)+(GAC*1.23)+(GAG*1.23)+
-              (GAT*1.33)+(GCA*1.23)+(GCC*1.12)+(GCG*1.12)+(GCT*1.23)+
-              (GGA*1.23)+(GGC*1.12)+(GGG*1.12)+(GGT*1.23)+(GTA*1.33)+
-              (GTC*1.23)+(GTG*1.23)+(GTT*1.33)+(TAA*1.43)+(TAC*1.33)+
-              (TAG*1.33)+(TAT*1.43)+(TCA*1.33)+(TCC*1.23)+(TCG*1.23)+
-              (TCT*1.33)+(TGA*1.33)+(TGC*1.23)+(TGG*1.23)+(TGT*1.33)+
-              (TTA*1.43)+(TTC*1.33)+(TTG*1.33)+(TTT*1.43)),
-         codon_CN_percOff = (theor_codon_cn-real_codon_cn)/theor_codon_cn
+for_fig <- full_df %>%
+  filter(contributing_bp > 200000000) %>% 
+  filter(! AGS_contig_wt %in% boxplot(full_df$AGS_contig_wt)$out
   )
 
-
-
-
-MG_aa_codon$ID <- str_replace(MG_aa_codon$ID, "_mms", "")
-MG_aa_codon$ID <- str_replace(MG_aa_codon$ID, "^P", "BMI_P")
-
-
-
-
-genomic_traits <- read.csv("data/input/derived/full_df.csv") %>%
-  select(-X)
-
-MG_aa_codon_chem <- left_join(MG_aa_codon, genomic_traits)
-
-
-
-MG_aa_codon_chem_sub_long <- MG_aa_codon_chem %>%
-  select(AA_CN, mean_cn, mean_OrgC, mean_N,
-         theor_codon_cn, real_codon_cn, codon_CN_percOff, horizon)%>%
-  pivot_longer(cols=c(theor_codon_cn, real_codon_cn), names_to = "type", values_to = "codon_cn")
-
-
-
-MG_codons_long <- MG_aa_codon_chem %>% 
-  pivot_longer(c(TTT,TTC,TTA,TTG,CTT,CTC,CTA,
-                 CTG,ATT,ATC,ATA,ATG,GTT,GTC,GTA, 
-                 GTG,TAT,TAC,TAA,TAG,CAT,CAC,CAA, 
-                 CAG,AAT,AAC,AAA,AAG,GAT,GAC,GAA, 
-                 GAG,TCT,TCC,TCA,TCG,CCT,CCC,CCA, 
-                 CCG,ACT,ACC,ACA,ACG,GCT,GCC,GCA, 
-                 GCG,TGT,TGC,TGA,TGG,CGT,CGC,CGA, 
-                 CGG,AGT,AGC,AGA,AGG,GGT,GGC,GGA,GGG), names_to = "Codon", values_to = "codon_freq")
-
-MG_codons_long <- codon_aa_key %>%
-  select(Codon, AA, GC_content, GC_pairs) %>%
-  left_join(MG_codons_long, . )
-
-MG_codons_long <- MG_codons_long %>%
-  group_by(AA, ID) %>%
-  summarize(AA_freq = sum(codon_freq)) %>%
-  left_join(MG_codons_long,.) %>%
-  mutate(codon_perc_of_aa = codon_freq/AA_freq)
-
-
-MG_codons_long$AA <- str_replace(MG_codons_long$AA, pattern = "\\*", replacement = "Stop")
-
-AA_Switch <- Vectorize(function(a) {
-  switch(as.character(a),
-         'A' = 'Alanine',
-         'R' = 'Arginine',
-         'N' = 'Asparagine',
-         'D' = 'Aspartic Acid',
-         'C' = 'Cysteine',
-         'E' = 'Glutamic Acid',
-         'Q' = 'Glutamine',
-         'G' = 'Glycine',
-         'H' = 'Histidine',
-         'I' = 'Isoleucine',
-         'L' = 'Leucine',
-         'K' = 'Lysine',
-         'M' = 'Methionine',
-         'F' = 'Phenylalanine',
-         'P' = 'Proline',
-         'S' = 'Serine',
-         'T' = 'Threonine',
-         'W' = 'Tryptophan',
-         'Y' = 'Tyrosine',
-         'V' = 'Valine',
-         'Stop' = 'Stop')
-})
-
-
 my.formula <- y ~ poly(x, 1, raw=TRUE)
 
-Fig2_B <- MG_codons_long %>%
-  filter(AA == "D" | AA == "E") %>%
-  filter(soil_OrgCtoN < 40)%>%
-  ggplot(., aes(soil_OrgCtoN, codon_perc_of_aa, group = Codon, color = GC_pairs)) +
-  geom_point(alpha = 0.4, size = 2, formula=my.formula)+
+Fig_1D_AGS_GC <- for_fig %>%
+  ggplot(., aes(AGS_contig_wt, GC_bact*100))+
+  geom_point(alpha = 0.7, size = 1.5, shape =21, fill = "#0C2340")+
+  geom_smooth(method = "lm", se = F, color = "#BD3039", formula=my.formula)+
   stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., sep = "~~~")),
+               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
+               small.p = T, 
                label.x = "right",
                label.y = "top",
+               color = "#BD3039",
                parse = TRUE,
-               size = 2)+
-  ylab("Codon frequency for Amino Acid")+
-  xlab(expression(Soil~C["extr"]:N["extr"]))+
+               size = 2.25)+
+  ylab("GC (%) content of Bacteria")+
+  xlab("Average Genome Size of Bacteria")+
   theme_pete()+
-  geom_smooth(method = "lm", se = F)+
-  #scale_fill_brewer(palette = "Set2")+
-  #scale_color_brewer(palette = "Dark2")+
-  scale_color_manual(name = "Number of\nGC base pairs\nin Codon", values = c("#007A33", "#BA9653"))+
-  facet_wrap(.~AA_Switch(AA), ncol = 1)+
-  theme(text=element_text(family="Arial"),
-        legend.position = "bottom")
-
-Fig2_B
-
-
-##Reworking this
-## Just going to look at fourfold substitution sites
-
-# list of amino acids with a fourfold degenerate sites
-degen_AA <- c("A", "G", "P", "T", "V")
-
-degenerates <- MG_codons_long %>% filter(AA %in% degen_AA)
-
-degenerates <- degenerates %>%
-  mutate(deg_site = str_sub(Codon, start = 3, end = 3))
-
-degenerates$deg_site <- factor(degenerates$deg_site, levels = c("A", "T", "C", "G"))
-
-
-generate_label_df <- function(TUKEY, variable){
-  
-  # Extract labels and factor levels from Tukey post-hoc 
-  Tukey.levels <- TUKEY[[variable]][,4]
-  Tukey.labels <- data.frame(multcompLetters(Tukey.levels)['Letters'])
-  
-  #I need to put the labels in the same order as in the boxplot :
-  Tukey.labels$type=rownames(Tukey.labels)
-  Tukey.labels=Tukey.labels[order(Tukey.labels$type) , ]
-  return(Tukey.labels)
-}
-
-
-codon_deg_mod <- aov(codon_perc_of_aa ~ deg_site, degenerates)
-codon_deg_anova <- anova(codon_deg_mod)
-codon_deg_anova
-f2a_tukey <- TukeyHSD(codon_deg_mod,  "deg_site", conf.level=0.95)
-f2a_tukey
-f2a_labels <- generate_label_df(f2a_tukey, "deg_site")
+  theme(text=element_text(family="Arial"))
 
 
 
-Fig2_A <- degenerates %>%
-  ggplot(., aes(deg_site, codon_perc_of_aa))+
-  geom_boxplot(alpha = 0.5, color = "black", fill = "grey")+
-  ylab("Frequency")+
-  xlab("Four-fold degenerate nucleotide")+
-  theme_pete()+
-  geom_text(data = f2a_labels, aes(x = type, y = .8, label = Letters), inherit.aes = FALSE, color = "darkred")+
-  theme(text=element_text(family="Arial", face = "bold"))
 
-Fig2_A
-
-
-output <- matrix(ncol=6, nrow = length(unique(MG_codons_long$Codon)))
-i=1
-for(codon_to_sub in unique(MG_codons_long$Codon)){
-  sub <- MG_codons_long %>% filter(Codon == codon_to_sub)
-  GC_to_add <- sub$GC_pairs[1]
-  AA_to_add <- sub$AA[1]
-  mod <- lm(codon_perc_of_aa~soil_OrgCtoN, sub)
-  out <- summary(mod)
-  Rsq <- out$r.squared
-  slope <- mod$coefficients[2]
-  p <- out$coefficients[2,4]
-  output[i,] <- c(codon_to_sub, slope, Rsq, p, GC_to_add, AA_to_add)
-  i = i +1
-}
-
-codon_output <- as.data.frame(output)
-colnames(codon_output) <- c("Codon", "Slope", "Rsq", "p", "GC_pairs", "AA")
-
-
-codon_output <- codon_output %>%
-  mutate(firstC = str_sub(Codon, start = 1, end = 1),
-         secondC = str_sub(Codon, start = 2, end = 2),
-         thirdC = str_sub(Codon, start = 3, end = 3),
-         dum = 1,
-         Slope = as.numeric(Slope),
-         AA_name = AA_Switch(AA),
-         for_index = paste(AA, GC_pairs, sep = "_"))
-
-codon_output <- codon_output %>%
-  group_by(for_index) %>% 
-  mutate(num_unique = length(unique(Codon)),
-         splitn = 1:length(unique(Codon)),
-         split_dum = splitn/num_unique,
-         psig = ifelse(as.numeric(p) < 0.05, "*", " "),
-         Codon_label = paste(Codon, psig))
-
-
-Fig2_C <- codon_output %>%
-  ggplot(., aes(GC_pairs, dum, fill = Slope, label=Codon_label))+
-  geom_col(position = "fill", color = "grey")+
-  geom_text(position = "fill", vjust = 1.35, size = 2.5)+
-  scale_fill_distiller(name = "Relationship\nbetween\nCodon Freq.\nand Extractable Soil C:N", palette = "RdBu")+
-  #scale_fill_distiller(name = "Relationship\nbetween\nCodon Freq. \nand Soil C:N", palette = "RdBu")+
-  #theme_tile()+
-  facet_grid(AA_name~., switch="both")+
-  theme(panel.grid = element_blank(), 
-        axis.ticks.y = element_blank(),
-        axis.text.y = element_blank(),
-        strip.background = element_blank(),
-        panel.spacing = unit(0, "pt"),
-        panel.background = element_rect(fill = "#ECE5F1"),
-        strip.text.y.left = element_text(angle = 0),
-        legend.text=element_text(size=5),
-        legend.title = element_text(size=7),
-        legend.text.align = 1,
-        text = element_text(size=8, face = "bold"))+
-  ylab("Amino Acid")+
-  xlab("Number of GC pairs per codon")
-
-Fig2_C
 
 layout <- "
-AABBCC
-AABBCC
-##BBCC
-####CC
-####CC
+AABD
+AAC#
 "
 
-Fig2 <- (Fig2_A + theme(plot.margin = unit(c(0,30,0,0), "pt"))) + Fig2_B + Fig2_C+ 
+
+Fig1 <- Fig_1A+Fig_1B_CtoN_GC+Fig_1C_CtoN_AGS+Fig_1D_AGS_GC+
   plot_layout(design = layout)+
   plot_annotation(tag_levels = 'A') &
   theme(plot.tag = element_text(size = 12))
-
-Fig2
-
-ggsave(filename = "paper/figures/Fig2.png", Fig2, height = 8, width = 9)
+#Fig1
 
 
-my.formula <- y ~ poly(x, 1, raw=TRUE)
 
+ggsave(filename = "paper/figures/Fig1.svg", Fig1, height =4.5, width = 8.5)
 
-Fig_1B_for_talk <- full_df %>%
-  ggplot(., aes(soil_OrgCtoN, AGS))+
-  stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
-               label.x = "left",
-               label.y = "top",
-               parse = TRUE,
-               size = 3)+
-  ylab("Average Genome Size (bp)")+
-  xlab(expression(Soil~C["extr"]:N["extr"]))+
-  geom_point(alpha = 0.7, size = 2, shape =21, fill = "#0C2340")+
-  geom_smooth( method = "lm", se = F, formula=my.formula, color = "#BD3039")+
-  theme_pete(base_size = 12)
-Fig_1B_for_talk
-my.formula <- y ~ poly(x, 3, raw=TRUE)
-Fig_1C_for_talk <- full_df %>%
-  ggplot(., aes(soil_OrgCtoN, GC_bact))+
-  stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
-               label.x = "left",
-               label.y = "top",
-               parse = TRUE,
-               size = 3)+
-  ylab("GC - %")+
-  xlab(expression(Soil~C["extr"]:N["extr"]))+
-  geom_point(alpha = 0.7, size = 2, shape =21, fill = "#0C2340")+
-  geom_smooth( method = "lm", se = F, formula=my.formula, color = "#BD3039")+
-  theme_pete(base_size = 12)
-
-ggsave(plot = Fig_1B_for_talk, "paper/figures/Fig1B_talk.png", height = 4, width = 5)
-ggsave(plot = Fig_1C_for_talk, "paper/figures/Fig1C_talk.png", height = 4, width = 5)
-
-full_df %>%
-  ggplot(., aes(soil_OrgCtoN, Nuc_CN))+
-  stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..rr.label.., ..p.value.label.., sep = "~~~")),
-               label.x = "left",
-               label.y = "top",
-               parse = TRUE,
-               size = 3)+
-  ylab("C:N of DNA")+
-  xlab(expression(Soil~C["extr"]:N["extr"]))+
-  geom_point(alpha = 0.7, size = 2, shape =21, fill = "#0C2340")+
-  geom_smooth( method = "lm", se = F, formula=my.formula, color = "#BD3039")+
-  theme_pete(base_size = 12)
